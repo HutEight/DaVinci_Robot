@@ -4,16 +4,31 @@
 #include <geometry_msgs/Polygon.h>
 #include <math.h>
 #include <limits>
+#include "std_msgs/MultiArrayLayout.h"
+#include "std_msgs/MultiArrayDimension.h"
+#include "std_msgs/Int32MultiArray.h"
+
+
 
 using namespace std;
 
 const double PI = 3.14;
 
 visualization_msgs::MarkerArray final_markers;
+std_msgs::Int32MultiArray score;
+
+void exitPointScoreArrayCB(const std_msgs::Int32MultiArray& score_array) {
+    ROS_INFO("exit Point score ArrayCB ..............");
+   
+    score = score_array;  
+}
+
+
 
 void exitPointArrayCB(const geometry_msgs::Polygon& point_array) {
     ROS_INFO("exitPointArrayCB ..............");
     final_markers.markers.clear();
+   
 
     int num = point_array.points.size();
     for(int i = 0; i < num; i++) {
@@ -35,9 +50,36 @@ void exitPointArrayCB(const geometry_msgs::Polygon& point_array) {
         marker.scale.y = 0.002;
         marker.scale.z = 0.0005;
         marker.color.a = 1.0; // Don't forget to set the alpha!
-        marker.color.r = 1.0;
-        marker.color.g = 0.0;
-        marker.color.b = 1.0;
+        
+       if(score.data[i]>741){ 
+           marker.color.r = 0.0;
+           marker.color.g = 0.0;
+           marker.color.b = 1.0;
+       }
+       else
+       {
+          if((score.data[i]<=741) && (score.data[i]>703)){
+             marker.color.r = 0.0;
+             marker.color.g = 1.0;
+             marker.color.b = 0.0;
+          }
+          else
+          { 
+            if((score.data[i]<=703) && (score.data[i]>=120)){
+             marker.color.r = 1.0;
+             marker.color.g = 0.0;
+             marker.color.b = 1.0;
+             ROS_WARN("parse points");   // 15 good poses and above
+            }
+            else
+            {
+             marker.color.r = 0.0;
+             marker.color.g = 0.0;
+             marker.color.b = 0.0;
+             ROS_WARN("even parse points");
+            }
+          }
+       }
         final_markers.markers.push_back(marker);      
     }     
 }
@@ -69,8 +111,14 @@ int main(int argc, char** argv) {
     ros::Publisher finalPointPub = nh.advertise<visualization_msgs::Marker>("/final_point_marker", 0);
     ros::Publisher finalExitPointsPub = nh.advertise<visualization_msgs::MarkerArray>("/possible_exit_points", 0);
 
+    //Add by DLC
+    ros::Subscriber receiveExitPointScoreArray = nh.subscribe("/exit_points_score", 1, exitPointScoreArrayCB);
+
     // ros::Subscriber receiveExitPoints = nh.subscribe("/exit_points", 1, exitPointsCB);
     ros::Subscriber receiveExitPointArray = nh.subscribe("/exit_point_array", 1, exitPointArrayCB);
+    
+    
+
 
     double radius = 0.005;
 
@@ -255,9 +303,12 @@ int main(int argc, char** argv) {
             to_send_point_array.points[1].z = transformed_clicked_point.point.z;
             sendExitPointArray.publish(to_send_point_array);
         }
-        finalPointPub.publish(final);
+        
+        
         finalExitPointsPub.publish(final_markers);
+       // final_markers.markers.clear();
 
+        finalPointPub.publish(final);
         //ros::Duration(0.5).sleep(); // sleep for half a second
         ros::spinOnce();
     }
